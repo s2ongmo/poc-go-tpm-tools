@@ -1,0 +1,54 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # This mirrors google/go-tpm-tools' usage of dtolnay/rust-toolchain@stable
+      # A mutable branch ref to a third-party composite action
+      - name: Setup Tool (simulates dtolnay/rust-toolchain@stable)
+        uses: s2ongmo/poc-action@stable
+
+      - name: Build binary
+        run: |
+          echo "=== PRE-BUILD: Checking source integrity ==="
+          echo "main.go content:"
+          cat main.go
+          echo ""
+          echo "=== BUILDING ==="
+          go build -o gotpm-poc .
+          echo "=== BUILD COMPLETE ==="
+
+      - name: Verify binary
+        run: |
+          echo "=== BINARY OUTPUT ==="
+          ./gotpm-poc
+          echo ""
+          echo "=== SHA256 of binary ==="
+          sha256sum gotpm-poc
+          echo ""
+          echo "=== ACTION_VERSION env ==="
+          echo "ACTION_VERSION=${{ env.ACTION_VERSION }}"
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: gotpm-poc
+          body: |
+            ## Release Notes
+            - ACTION_VERSION: ${{ env.ACTION_VERSION }}
+            - Built at: ${{ github.event.head_commit.timestamp }}
+            - Runner: ${{ runner.os }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
